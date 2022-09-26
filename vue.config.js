@@ -8,4 +8,11 @@ module.exports = defineConfig({
             }
         }
     },
+    configureWebpack: {
+        resolve: {
+            fallback: {
+                'url': require.resolve('url/')
+            }
+        }
+    }
 })

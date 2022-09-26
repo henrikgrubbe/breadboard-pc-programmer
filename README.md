@@ -1,4 +1,4 @@
-# fit-qr
+# breadboard-computer-programmer
 
 ## Project setup
 ```

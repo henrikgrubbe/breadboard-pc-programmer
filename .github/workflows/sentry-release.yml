@@ -9,7 +9,7 @@ jobs:
   build_and_release:
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: fit-qr
+      IMAGE_NAME: breadboard-pc-programmer
     steps:
       - name: Checkout
         uses: actions/checkout@v3
