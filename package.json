@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@sentry/tracing": "^7.13.0",
-    "@sentry/vue": "^7.13.0",
+    "@sentry/vue": "^7.14.0",
     "bootstrap": "^5.2.1",
     "core-js": "^3.25.3",
     "highlight.js": "^11.6.0",
