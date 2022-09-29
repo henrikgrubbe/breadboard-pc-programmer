@@ -9,6 +9,14 @@ module.exports = defineConfig({
         }
     },
     configureWebpack: {
+        module: {
+            rules: [
+                {
+                    resourceQuery: /raw/,
+                    type: 'asset/source'
+                }
+            ]
+        },
         resolve: {
             fallback: {
                 'url': require.resolve('url/')

@@ -6,13 +6,23 @@
     </div>
 
     <div class="row mb-5">
-      <div class="col-lg-10 col-xl-8 mb-3">
+      <div class="col-6 mb-3">
         <label for="program-txt" class="form-label">Write your program</label>
-        <textarea v-model="programString" class="form-control" id="program-txt" rows="16" ></textarea>
+        <textarea v-model="programString" class="form-control" id="program-txt" rows="16"></textarea>
+      </div>
+
+      <div class="col-4 mb-3">
+        <label for="program-txt" class="form-label">Compiled program</label>
+        <p v-if="error" class="text-secondary">
+          {{ error }}
+        </p>
+        <pre v-else>{{ compiledProgram }}</pre>
       </div>
 
       <div class="col-12">
-        <button @click="uploadProgram" type="button" class="btn btn-success btn-lg me-1">Upload</button>
+        <button @click="uploadProgram" :disabled="error !== ''" type="button" class="btn btn-success btn-lg me-1">
+          Upload
+        </button>
         <button @click="writeProgram" type="button" class="btn btn-warning btn-lg">Command program</button>
       </div>
     </div>
@@ -21,14 +31,18 @@
       <div class="col-lg-10 col-xl-8 mb-3">
         <label for="program-txt" class="form-label">Write a single RAM address</label>
         <div class="input-group mb-3">
-          <input v-model="data" type="number" class="form-control" placeholder="Value" aria-label="Value">
+          <input v-model="data" type="number" min="0" max="255" class="form-control" placeholder="Value"
+                 aria-label="Value">
           <span class="input-group-text">@</span>
-          <input v-model="address" type="number" min="0" max="15" class="form-control" placeholder="Address" aria-label="Address">
+          <input v-model="address" type="number" min="0" max="15" class="form-control" placeholder="Address"
+                 aria-label="Address">
         </div>
       </div>
 
       <div class="col-12">
-        <button @click="writeImmediate" type="button" class="btn btn-success btn-lg me-1">Write</button>
+        <button @click="writeImmediate" :disabled="data === '' || address === ''" type="button"
+                class="btn btn-success btn-lg me-1">Write
+        </button>
       </div>
     </div>
   </div>
@@ -37,61 +51,80 @@
 <script lang="ts">
 import '@/assets/style.scss'
 import {defineComponent} from 'vue';
+import * as peggy from 'peggy';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const grammar = require('@/assets/grammar.peggy?raw');
 
 export default defineComponent({
   name: 'Breadboard PC programmer',
   components: {},
   data() {
     return {
+      parser: peggy.generate(grammar),
       programString: '' as string,
+      error: ' ' as string,
+      compiledProgram: '' as string,
       address: '' as string,
-      data: '' as string
-    }
+      data: '' as string,
+    };
+  },
+  watch: {
+    programString: function (newVal: string) {
+      let parsed;
+      try {
+        parsed = this.parser.parse(newVal);
+      } catch (e) {
+        this.error = e as string;
+        return;
+      }
+      this.error = '';
+      this.compiledProgram = parsed.join('\n').trim();
+    },
   },
   methods: {
-    clear(): void {
-      this.programString = '';
-    },
     uploadProgram(): void {
-      console.log(this.programString);
-      const body: Record<string, string> = {};
-      this.programString
+      if (this.error) {
+        return;
+      }
+
+      const body: Record<string, number> = {};
+      this.compiledProgram
           .split('\n')
-          .forEach((line, lineNumber) => {
-            body[lineNumber] = line;
+          .forEach((line: string) => {
+            const [address, instruction] = line.split(':');
+            body[parseInt(address, 2).toString()] = parseInt(instruction, 2);
           });
 
-      const requestOptions = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
-      };
-
-      fetch('https://mqtt.it.fantastiskefroe.dk/publish/program', requestOptions)
-          .then((response) => response.json())
-          .then((data) => console.log(data))
-          .catch(error => console.error('There was an error!', error));
+      this.publishToTopic('program', body);
     },
     writeProgram(): void {
-      const requestOptions = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({command: "PROGRAM"})
+      const body = {
+        command: 'PROGRAM',
       };
 
-      fetch('https://mqtt.it.fantastiskefroe.dk/publish/command', requestOptions)
-          .then((response) => response.json())
-          .then((data) => console.log(data))
-          .catch(error => console.error('There was an error!', error));
+      this.publishToTopic('command', body);
     },
     writeImmediate(): void {
+      if (this.address === '' || this.data === '') {
+        return;
+      }
+
+      const body = {
+        command: 'WRITE',
+        address: this.address,
+        data: this.data
+      };
+
+      this.publishToTopic('command', body);
+    },
+    publishToTopic(topic: string, data: object): Promise<void> {
       const requestOptions = {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({command: "WRITE", address: this.address, data: this.data})
+        body: JSON.stringify(data)
       };
 
-      fetch('https://mqtt.it.fantastiskefroe.dk/publish/command', requestOptions)
+      return fetch(`https://mqtt.it.fantastiskefroe.dk/publish/${topic}`, requestOptions)
           .then((response) => response.json())
           .then((data) => console.log(data))
           .catch(error => console.error('There was an error!', error));
@@ -101,4 +134,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+pre {
+  font-size: 1rem;
+}
 </style>
