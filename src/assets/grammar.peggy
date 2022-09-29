@@ -27,7 +27,7 @@ program
 
 line
   = (lbl:label":"  _ ("\n"+)* _ { addLabel(lbl, location()) })?
-    c:command _ ("\n"+)? { return calculateAddress(location()) + ":" + c }
+    _ ("\n"+)? c:command _ ("\n"+)? { return calculateAddress(location()) + ":" + c }
 
 command
   = instruction
