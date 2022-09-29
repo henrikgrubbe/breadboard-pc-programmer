@@ -14,7 +14,7 @@
     "peggy": "^2.0.1",
     "prismjs": "^1.29.0",
     "url": "^0.11.0",
-    "vue": "^3.2.39",
+    "vue": "^3.2.40",
     "vue-prism-editor": "^2.0.0-alpha.2"
   },
   "devDependencies": {
