@@ -6,7 +6,7 @@ module.exports = {
         ['prismjs', {
             'languages': ['javascript', 'armasm'],
             'plugins': ['line-numbers'],
-            'theme': 'tomorrow-night',
+            'theme': 'tomorrow',
             'css': true
         }]
     ]

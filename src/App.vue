@@ -59,7 +59,6 @@ import * as peggy from 'peggy';
 import {PrismEditor} from 'vue-prism-editor';
 import 'vue-prism-editor/dist/prismeditor.min.css';
 import Prism from 'prismjs';
-import 'prismjs/themes/prism-tomorrow.css';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const grammar = require('@/assets/grammar.peggy?raw');
 
