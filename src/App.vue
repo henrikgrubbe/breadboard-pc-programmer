@@ -119,34 +119,25 @@ export default defineComponent({
         return;
       }
       this.error = '';
-      this.compiledProgram = parsed.join('\n').trim();
+      this.compiledProgram = parsed.bin
     },
     highlighter(code: string) {
-      const rules = [
-        {
-          name: 'keyword',
-          pattern: /(nop|lda|add|sub|sta|ldi|jmp|jc|jz|out|hlt)/g,
-          style: 'color: #e06c75',
-        },
-        {
-          name: 'integer',
-          pattern: /\b(0x[0-9a-f]+|0b[01]+|[0-9]+)\b/gi,
-          style: 'color: #56b6c2',
-        },
-      ];
+      let markedUp
+      try {
+        markedUp = this.parser.parse(code).code;
+        console.log("HIGHTLIGHED", markedUp);
+        return markedUp
+      } catch (e: unknown) {
+        return code;
+      }
+      // markedUp
+      // let result = tokenized;
+      // rules.forEach((rule) => {
+      //   const regex = RegExp(`<${rule.name}>(.*?)</${rule.name}>`, 'gm');
+      //   result = result.replace(regex, `<span class="${rule.name}" style="${rule.style}">$1</span>`);
+      // });
 
-      let tokenized = code;
-      rules.forEach((rule) => {
-        tokenized = tokenized.replace(rule.pattern, `<${rule.name}>$1</${rule.name}>`);
-      });
-
-      let result = tokenized;
-      rules.forEach((rule) => {
-        const regex = RegExp(`<${rule.name}>(.*?)</${rule.name}>`, 'gm');
-        result = result.replace(regex, `<span class="${rule.name}" style="${rule.style}">$1</span>`);
-      });
-
-      return result;
+      // return result;
     },
     uploadProgram(): void {
       if (this.error) {
@@ -217,4 +208,10 @@ export default defineComponent({
 pre {
   font-size: 1rem;
 }
+
+token-mnemonic { color: salmon; }
+token-immidiate { color: yellow; }
+token-label-definition {color: grey; }
+token-label-definition  token-label { color: green; }
+token-instr token-label { color: limegreen; }
 </style>
