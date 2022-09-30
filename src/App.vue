@@ -6,20 +6,30 @@
     </div>
 
     <div class="row mb-5">
-      <div class="col-6 mb-3 overflow-hidden">
+      <div class="col-12 col-lg-6 mb-3 overflow-hidden">
         <label class="form-label">Write your program</label>
-        <prism-editor class="editor" v-model="programString" :highlight="highlighter" :line-numbers="true"></prism-editor>
+        <prism-editor class="editor"
+                      v-model="programString"
+                      :highlight="highlighter"
+                      :line-numbers="true">
+        </prism-editor>
       </div>
 
-      <div class="col-4 mb-3 overflow-hidden">
+      <div class="col-12 col-lg-4 mb-3 overflow-hidden">
         <label for="program-txt" class="form-label">Compiled program</label>
         <div v-if="error">
-          <p class="text-secondary">
-            {{ error }}
-          </p>
+          <prism-editor class="editor"
+                        v-model="error"
+                        :highlight="(str) => `<span class='text-danger'>${str}</span>`"
+                        :readonly="true">
+          </prism-editor>
         </div>
         <div v-else>
-          <prism-editor class="editor" v-model="compiledProgram" :highlight="(str) => str" :line-numbers="true" :readonly="true"></prism-editor>
+          <prism-editor class="editor"
+                        v-model="compiledProgram"
+                        :highlight="(str) => str"
+                        :readonly="true">
+          </prism-editor>
         </div>
       </div>
 
@@ -31,24 +41,24 @@
       </div>
     </div>
 
-    <div class="row">
-      <div class="col-lg-10 col-xl-8 mb-3">
-        <label for="program-txt" class="form-label">Write a single RAM address</label>
-        <div class="input-group mb-3">
-          <input v-model="data" type="number" min="0" max="255" class="form-control" placeholder="Value"
-                 aria-label="Value">
-          <span class="input-group-text">@</span>
-          <input v-model="address" type="number" min="0" max="15" class="form-control" placeholder="Address"
-                 aria-label="Address">
-        </div>
-      </div>
+    <!--    <div class="row">-->
+    <!--      <div class="col-lg-10 col-xl-8 mb-3">-->
+    <!--        <label for="program-txt" class="form-label">Write a single RAM address</label>-->
+    <!--        <div class="input-group mb-3">-->
+    <!--          <input v-model="data" type="number" min="0" max="255" class="form-control" placeholder="Value"-->
+    <!--                 aria-label="Value">-->
+    <!--          <span class="input-group-text">@</span>-->
+    <!--          <input v-model="address" type="number" min="0" max="15" class="form-control" placeholder="Address"-->
+    <!--                 aria-label="Address">-->
+    <!--        </div>-->
+    <!--      </div>-->
 
-      <div class="col-12">
-        <button @click="writeImmediate" :disabled="data === '' || address === ''" type="button"
-                class="btn btn-success btn-lg me-1">Write
-        </button>
-      </div>
-    </div>
+    <!--      <div class="col-12">-->
+    <!--        <button @click="writeImmediate" :disabled="data === '' || address === ''" type="button"-->
+    <!--                class="btn btn-success btn-lg me-1">Write-->
+    <!--        </button>-->
+    <!--      </div>-->
+    <!--    </div>-->
   </div>
 </template>
 
@@ -58,12 +68,9 @@ import {defineComponent} from 'vue';
 import * as peggy from 'peggy';
 import {PrismEditor} from 'vue-prism-editor';
 import 'vue-prism-editor/dist/prismeditor.min.css';
-import Prism from 'prismjs';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const grammar = require('@/assets/grammar.peggy?raw');
 
-Prism.manual = true;
-Prism.highlightAll();
 
 export default defineComponent({
   name: 'Breadboard PC programmer',
@@ -73,9 +80,10 @@ export default defineComponent({
   data() {
     return {
       parser: peggy.generate(grammar),
+      placeholderProgram: 'data:\t10\n\t\tldi 4\nx:\t\tadd data\n\t\tout\n\t\tjmp x\n' as string,
       programString: '' as string,
-      error: '' as string,
       compiledProgram: '' as string,
+      error: ' ' as string,
       address: '' as string,
       data: '' as string,
     };
@@ -90,8 +98,8 @@ export default defineComponent({
       let parsed;
       try {
         parsed = this.parser.parse(code);
-      } catch (e) {
-        this.error = e as string;
+      } catch (e: unknown) {
+        this.error = (e as { message: string }).message as string;
         return;
       }
       this.error = '';
@@ -100,9 +108,31 @@ export default defineComponent({
   },
   methods: {
     highlighter(code: string) {
-      const s = Prism.highlight(code, Prism.languages.armasm, 'armasm');
-      // console.info(s);
-      return s;
+      const rules = [
+        {
+          name: 'keyword',
+          pattern: /(nop|lda|add|sub|sta|ldi|jmp|jc|jz|out|hlt)/g,
+          style: 'color: #e06c75',
+        },
+        {
+          name: 'integer',
+          pattern: /(\d+)/g,
+          style: 'color: #56b6c2',
+        },
+      ];
+
+      let tokenized = code;
+      rules.forEach((rule) => {
+        tokenized = tokenized.replace(rule.pattern, `<${rule.name}>$1</${rule.name}>`);
+      });
+
+      let result = tokenized;
+      rules.forEach((rule) => {
+        const regex = RegExp(`<${rule.name}>(.*?)</${rule.name}>`, 'gm');
+        result = result.replace(regex, `<span class="${rule.name}" style="${rule.style}">$1</span>`);
+      });
+
+      return result;
     },
     uploadProgram(): void {
       if (this.error) {

@@ -26,8 +26,8 @@ program
   = line *
 
 line
-  = (lbl:label":"  _ ("\n"+)* _ { addLabel(lbl, location()) })?
-    _ ("\n"+)? c:command _ ("\n"+)? { return calculateAddress(location()) + ":" + c }
+  = (lbl:label":" __ { addLabel(lbl, location()) })?
+    __ c:command __ { return calculateAddress(location()) + ":" + c }
 
 command
   = instruction
@@ -71,3 +71,6 @@ byte "8 bit word"
 
 _ "whitespace"
   = [ \t\r]*
+
+__ "whitespace and newline"
+  = [ \n\t\r]*
