@@ -34,10 +34,12 @@
       </div>
 
       <div class="col-12">
-        <button @click="uploadProgram" :disabled="error !== ''" type="button" class="btn btn-success btn-lg me-1">
+        <button @click="uploadProgram" :disabled="error !== ''" type="button" class="btn btn-success  me-1">
           Upload
         </button>
-        <button @click="writeProgram" type="button" class="btn btn-warning btn-lg">Command program</button>
+        <button @click="writeProgram" type="button" class="btn btn-warning ">
+          Command program
+        </button>
       </div>
     </div>
 
@@ -71,6 +73,20 @@ import 'vue-prism-editor/dist/prismeditor.min.css';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const grammar = require('@/assets/grammar.peggy?raw');
 
+const debounce = (fn: any, delay: number) => {
+  let timeout: number | undefined
+
+  return (...args: any) => {
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+
+    timeout = setTimeout(() => {
+      fn(...args)
+    }, delay)
+  }
+}
+
 export default defineComponent({
   name: 'Breadboard PC programmer',
   components: {
@@ -85,15 +101,16 @@ export default defineComponent({
       error: ' ' as string,
       address: '' as string,
       data: '' as string,
+      debouncedCompiler: debounce(this.compile, 500),
     };
   },
   watch: {
     programString: function (code: string) {
-      if (code.split('\n').length > 16) {
-        this.error = 'Program too long';
-        return;
-      }
-
+      this.debouncedCompiler(code);
+    },
+  },
+  methods: {
+    compile(code: string): void {
       let parsed;
       try {
         parsed = this.parser.parse(code);
@@ -104,8 +121,6 @@ export default defineComponent({
       this.error = '';
       this.compiledProgram = parsed.join('\n').trim();
     },
-  },
-  methods: {
     highlighter(code: string) {
       const rules = [
         {
