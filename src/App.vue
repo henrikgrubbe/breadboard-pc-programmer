@@ -71,7 +71,6 @@ import 'vue-prism-editor/dist/prismeditor.min.css';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const grammar = require('@/assets/grammar.peggy?raw');
 
-
 export default defineComponent({
   name: 'Breadboard PC programmer',
   components: {
@@ -116,7 +115,7 @@ export default defineComponent({
         },
         {
           name: 'integer',
-          pattern: /(\d+)/g,
+          pattern: /\b(0x[0-9a-f]+|0b[01]+|[0-9]+)\b/gi,
           style: 'color: #56b6c2',
         },
       ];
