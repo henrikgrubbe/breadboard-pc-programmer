@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "bootstrap": "^5.2.1",
-    "core-js": "^3.25.3",
+    "core-js": "^3.25.5",
     "peggy": "^2.0.1",
     "url": "^0.11.0",
     "vue": "^3.2.40",
