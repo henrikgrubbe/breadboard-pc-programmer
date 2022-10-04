@@ -12,7 +12,7 @@
   }
 
   function _parseBinary(prefix, digits, radix, length) {
- 	  const str = digits.join("")
+ 	const str = digits.join("")
     const raw = prefix + str;
     const parsed = parseInt(str, radix); 
 
@@ -137,9 +137,7 @@ byte "8 bit word"
     { return parseByte("", digits, 10) }
 
 _ "whitespace"
-  = ws:[ \t]* 
-    { return ws.join("") }
+  = $ [ \t]*
 
 __ "whitespace and newline"
-  = ws:[ \n\t\r]* 
-    { return ws.join("") }
+  = $ [ \n\t\r]*
