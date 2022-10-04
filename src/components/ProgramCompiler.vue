@@ -2,9 +2,9 @@
   <div class="row mb-5">
     <div class="col-12 col-lg-6 mb-3 overflow-hidden">
       <label class="form-label">Write your program</label>
-      <prism-editor class="editor"
-                    v-model="programString"
-                    :highlight="highlighter"
+      <prism-editor class="editor source"
+                    v-model="source"
+                    :highlight="sourceHighlighter"
                     :line-numbers="true">
       </prism-editor>
     </div>
@@ -13,40 +13,30 @@
       <div class="mb-3">
         <label for="program-txt" class="form-label">Compiled program</label>
         <div v-if="error">
-          <prism-editor class="editor"
+          <prism-editor class="editor error"
                         v-model="error"
-                        :highlight="(str) => `<span class='text-danger'>${str}</span>`"
+                        :highlight="(err) => err"
                         :readonly="true">
           </prism-editor>
         </div>
         <div v-else>
-          <prism-editor class="editor"
-                        v-model="compiledProgram"
-                        :highlight="(str) => str"
+          <prism-editor class="editor compiled"
+                        v-model="compiled"
+                        :highlight="compiledHighlighter"
                         :readonly="true">
           </prism-editor>
         </div>
       </div>
 
       <div class="btn-group d-flex justify-content-end" role="group" aria-label="button group">
-        <button @click="uploadProgram" :disabled="error !== ''" type="button" class="btn btn-lg btn-outline-primary">
+        <button @click="uploadProgram" :disabled="error !== ''" type="button" class="btn btn-lg btn-primary">
           Upload
         </button>
-        <button @click="writeProgram" type="button" class="btn btn-lg btn-outline-success">
+        <button @click="writeProgram" type="button" class="btn btn-lg btn-success">
           Write to RAM
         </button>
       </div>
     </div>
-
-
-    <!--    <div class="col-12">-->
-    <!--      <button @click="uploadProgram" :disabled="error !== ''" type="button" class="btn btn-success  me-1">-->
-    <!--        Upload-->
-    <!--      </button>-->
-    <!--      <button @click="writeProgram" type="button" class="btn btn-warning ">-->
-    <!--        Command program-->
-    <!--      </button>-->
-    <!--    </div>-->
   </div>
 </template>
 
@@ -68,14 +58,17 @@ export default defineComponent({
   data() {
     return {
       parser: peggy.generate(grammar),
-      programString: '' as string,
-      compiledProgram: '' as string,
+      source: '' as string,
+      compiled: '' as string,
       error: ' ' as string,
       debouncedCompiler: debounce(this.compile, 500),
     };
   },
+  mounted() {
+    this.source = '      ldi 4\nx:j:  add data\n      out\n      jmp j\ndata: 0x42\n'
+  },
   watch: {
-    programString: function (code: string) {
+    source: function (code: string) {
       this.debouncedCompiler(code);
     },
   },
@@ -83,20 +76,27 @@ export default defineComponent({
     compile(code: string): void {
       let parsed;
       try {
-        parsed = this.parser.parse(code);
+        parsed = this.parser.parse(code, {compile: true});
       } catch (e: unknown) {
+        console.log(e);
         this.error = (e as { message: string }).message as string;
         return;
       }
       this.error = '';
-      this.compiledProgram = parsed.bin
+      this.compiled = parsed;
     },
-    highlighter(code: string) {
+    sourceHighlighter(code: string) {
       try {
-        return this.parser.parse(code).code;
+        return this.parser.parse(code, {highlight: true});
       } catch (e: unknown) {
         return code;
       }
+    },
+    compiledHighlighter(code: string) {
+      return code
+          .split('\n')
+          .map((line: string) => line.replace(/(\d{4}):(\d{4})(\d{4})/, '<compiled-addr>$1</compiled-addr>:<compiled-instr>$2</compiled-instr><compiled-optcode>$3</compiled-optcode>'))
+          .join('\n');
     },
     uploadProgram(): void {
       if (this.error) {
@@ -104,7 +104,7 @@ export default defineComponent({
       }
 
       const body: Record<string, number> = {};
-      this.compiledProgram
+      this.compiled
           .split('\n')
           .forEach((line: string) => {
             const [address, instruction] = line.split(':');
@@ -124,36 +124,60 @@ export default defineComponent({
 
 <style lang="scss">
 .editor {
-  background: #2d2d2d;
-  color: #ccc;
-
-  font-family: Fira code, Fira Mono, Consolas, Menlo, Courier, monospace;
-  font-size: 14px;
-  line-height: 1.5;
+  background: #2B2B2B;
+  color: #A9B7C6;
   padding: 5px;
+}
+
+.editor,
+.prism-editor__line-number {
+  font-family: Fira code, Fira Mono, Consolas, Menlo, Courier, monospace;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .prism-editor__textarea:focus {
   outline: none;
 }
 
-token-mnemonic {
-  color: salmon;
+
+.prism-editor-wrapper.source {
+  token-mnemonic {
+    color: #CC7832;
+  }
+
+  token-immediate {
+    color: #6897BB;
+  }
+
+  token-instr token-label {
+    color: #9876AA;
+  }
+
+  token-label-definition {
+    color: #808080;
+  }
+
+  token-label-definition token-label {
+    color: #FFC66D;
+  }
 }
 
-token-immidiate {
-  color: yellow;
+.prism-editor-wrapper.error {
+  color: #BC3F3C;
 }
 
-token-label-definition {
-  color: grey;
-}
+.prism-editor-wrapper.compiled {
+  compiled-addr {
+    color: #A5C261;
+  }
 
-token-label-definition token-label {
-  color: green;
-}
+  compiled-instr {
+    color: #6D9CBE;
+  }
 
-token-instr token-label {
-  color: limegreen;
+  compiled-optcode {
+    color: #BC3F3C;
+  }
 }
 </style>

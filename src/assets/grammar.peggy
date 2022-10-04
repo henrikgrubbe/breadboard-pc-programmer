@@ -1,99 +1,145 @@
-{{
-  function parseToBinary(digits, radix, length) {
-    return toBinary(parseInt(digits.join(""), radix), length);
-  }
-
+{{ 
   function toBinary(number, length) {
-    return number.toString(2).padStart(length, '0');
+    return number.toString(2).padStart(length, "0");
   }
 
-  function parseNibble(digits, radix) {
- 	const str = digits.join("")
-    const val = parseInt(str, radix); 
-    return {type: "nibble", value: val, f: () => toBinary(val, 4), h: () => wrapInTag("token-immidiate", str) }
-  }
-
-  function parseByte(digits, radix) {
- 	const str = digits.join("")
-    const val = parseInt(str, radix); 
-    return {type: "byte", value: val, f: () => toBinary(val, 8), h: () => wrapInTag("token-immidiate", str) }
-  }
-
-  function calculateAddress(location) {
-    return toBinary(location.start.line - 1, 4);
-  }
   function wrapInTag(tag, value) {
   	return `<${tag}>${value}</${tag}>`
+  }
+
+  function _checkBinaryLength(value, radix, length) {
+    return toBinary(parseInt(value, radix), length).length === length;
+  }
+
+  function _parseBinary(prefix, digits, radix, length) {
+ 	  const str = digits.join("")
+    const raw = prefix + str;
+    const parsed = parseInt(str, radix); 
+
+    return {
+      parsed,
+      raw,
+      f: () => toBinary(parsed, length), 
+      h: () => wrapInTag("token-immediate", raw) 
+    };
   }
 }}
 
 {
   const labelMap = {};
   const instructions = [];
+
   function addInstruction(instr) {
-  	instructions.push(instr)
+  	instructions.push(instr);
   }
+
   function addLabel(lbl) {
-  	labelMap[lbl] = {type: "label", label: lbl, location: instructions.length};
+  	labelMap[lbl] = {
+      label: lbl, 
+      location: instructions.length
+    };
   }
+
   function getLabel(lbl) {
+    if (labelMap[lbl] === undefined) {
+      error(`Use of undefined label: "${lbl}"`);
+    }
+
     return labelMap[lbl];
   }
 
-  function compile() {
-    console.log(labelMap, instructions)
-    return instructions.map((instr,index) => toBinary(index,4)+":"+instr.f()).join("\n")
+  function parseNibble(prefix, digits, radix) {
+    return _parseInteger(prefix, digits, radix, 4);
+  }
+
+  function parseByte(prefix, digits, radix) {
+    return _parseInteger(prefix, digits, radix, 8);
+  }
+
+  function _parseInteger(prefix, digits, radix, length) {
+    const result = _parseBinary(prefix, digits, radix, length);
+
+    if (result.f().length > length) {
+      error(`Value ${result.raw} (0b${result.f()}) too large for memory!`);
+    }
+
+    return result;
+  }
+
+  function compile(lines) {
+    if (options.compile) {
+      console.info("labels", labelMap);
+      console.info("instructions", instructions);
+
+      return instructions
+        .map((instr, index) => `${toBinary(index, 4)}:${instr.f()}`)
+        .join("\n");
+    }
+
+    if (options.highlight) {
+      return lines.join("");
+    }
+
+    error("Option 'compile' or 'highlight' must be passed to parse function");
   }
 }
 
 program
-  = l:line* { return {bin: compile(), code: l.join("") } } 
+  = lines:line* { return compile(lines) } 
 
 line
-  = lbls:(lbl:label":" ws:__ { addLabel(lbl); return wrapInTag("token-label-definition", lbl+":")+ws })* ws1:__ cmd:command ws2:__ { return lbls.join("")+ws1+cmd+ws2}
+  = lbls:(lbl:label":" ws:__ { addLabel(lbl.f()); return wrapInTag("token-label-definition", lbl.h()+":") + ws } )* ws1:__ cmd:command ws2:__ 
+    { return `${lbls.join("")}${ws1}${cmd}${ws2}` }
 
 command
-  = i:instruction { return wrapInTag("token-instr", i) }
-  / b:byte { addInstruction({key: ".byte", f: () => b.f()}); return wrapInTag("token-instr-pseudo",b.h()) }
+  = i:instruction 
+    { return wrapInTag("token-instr", i) }
+  / b:byte 
+    { addInstruction({f: () => b.f()}); return wrapInTag("token-instr-pseudo", b.h()) }
 
 instruction
-  = "nop"                  { addInstruction({key: "nop", f: () => "00000000" }); return wrapInTag("token-mnemonic", "nop") }
-  / "lda" ws:_ a:address   { addInstruction({key: "lda", f: () => "0001" + a.f() }); return wrapInTag("token-mnemonic", "lda")+ws+a.h() }
-  / "add" ws:_ a:address   { addInstruction({key: "add", f: () => "0010" + a.f() }); return wrapInTag("token-mnemonic", "add")+ws+a.h() }
-  / "sub" ws:_ a:address   { addInstruction({key: "sub", f: () => "0011" + a.f() }); return wrapInTag("token-mnemonic", "sub")+ws+a.h() }
-  / "sta" ws:_ a:address   { addInstruction({key: "sta", f: () => "0100" + a.f() }); return wrapInTag("token-mnemonic", "sta")+ws+a.h() }
-  / "ldi" ws:_ i:immediate { addInstruction({key: "ldi", f: () => "0101" + i.f() }); return wrapInTag("token-mnemonic", "ldi")+ws+i.h() }
-  / "jmp" ws:_ a:address   { addInstruction({key: "jmp", f: () => "0110" + a.f() }); return wrapInTag("token-mnemonic", "jmp")+ws+a.h() }
-  / "jc"  ws:_ a:address   { addInstruction({key: "jc",  f: () => "0111" + a.f() }); return wrapInTag("token-mnemonic", "jc")+ws+a.h() }
-  / "jz"  ws:_ a:address   { addInstruction({key: "jz",  f: () => "1000" + a.f() }); return wrapInTag("token-mnemonic", "jz")+ws+a.h() }
-  / "out"                  { addInstruction({key: "out", f: () => "11100000" }); return wrapInTag("token-mnemonic", "out") }
-  / "hlt"                  { addInstruction({key: "hlt", f: () => "11110000" }); return wrapInTag("token-mnemonic", "hlt") }
+  = mne:"lda" ws:_ a:address   { addInstruction({f: () => "0001" + a.f()}); return `${wrapInTag("token-mnemonic", mne)}${ws}${a.h()}` }
+  / mne:"add" ws:_ a:address   { addInstruction({f: () => "0010" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
+  / mne:"sub" ws:_ a:address   { addInstruction({f: () => "0011" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
+  / mne:"sta" ws:_ a:address   { addInstruction({f: () => "0100" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
+  / mne:"ldi" ws:_ i:immediate { addInstruction({f: () => "0101" + i.f()}); return wrapInTag("token-mnemonic", mne)+ws+i.h() }
+  / mne:"jmp" ws:_ a:address   { addInstruction({f: () => "0110" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
+  / mne:"jc"  ws:_ a:address   { addInstruction({f: () => "0111" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
+  / mne:"jz"  ws:_ a:address   { addInstruction({f: () => "1000" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
+  / mne:"nop"                  { addInstruction({f: () => "00000000"}); return wrapInTag("token-mnemonic", mne) }
+  / mne:"out"                  { addInstruction({f: () => "11100000"}); return wrapInTag("token-mnemonic", mne) }
+  / mne:"hlt"                  { addInstruction({f: () => "11110000"}); return wrapInTag("token-mnemonic", mne) }
 
 address
-  = imm:immediate { return {type: "imm_address", value: imm, f: imm.f, h: () => wrapInTag("token-jump-target",imm.h())}}
-  / lbl:label { return {type: "lbl_address", label: lbl, f: () => {return toBinary(getLabel(lbl).location, 4)}, h: () => wrapInTag("token-jump-target", lbl)}}
+  = imm:immediate 
+    { return {f: imm.f, h: () => wrapInTag("token-jump-target", imm.h()) } }
+  / lbl:label 
+    { return {f: () => toBinary(getLabel(lbl.f()).location, 4), h: () => wrapInTag("token-jump-target", lbl.h())} }
 
 immediate "4 bit word"
-  = "0x" digits:[0-9A-Fa-f]+ & { return parseToBinary(digits, 16, 4).length <= 4 }
-    { return parseNibble(digits, 16) }
-  / "0b" digits:[0-1]+ & { return parseToBinary(digits, 2, 4).length <= 4 }
-    { return parseNibble(digits, 2) }
-  / digits:[0-9]+ & { return parseToBinary(digits, 10).length <= 4 }
-    { return parseNibble(digits, 10) }
+  = prefix:"0x" digits:[0-9A-Fa-f]+
+    { return parseNibble(prefix, digits, 16) }
+  / prefix:"0b" digits:[0-1]+
+    { return parseNibble(prefix, digits, 2) }
+  / digits:[0-9]+
+    { return parseNibble("", digits, 10) }
 
 label "label"
-  = text:[a-zA-Z]+[a-zA-Z0-9]* { return wrapInTag("token-label", text.join("")) }
+  = text:[a-zA-Z]+[a-zA-Z0-9]* 
+    { const lbl = text.join(""); return {f: () => lbl, h: () => wrapInTag("token-label", lbl)} }
 
 byte "8 bit word"
-  = "0x" digits:[0-9A-Fa-f]+ & { return parseToBinary(digits, 16, 8).length <= 8 }
-    { return parseByte(digits, 16) }
-  / "0b" digits:[0-1]+ & { return parseToBinary(digits, 2, 8).length <= 8 }
-    { return parseByte(digits, 2) }
-  / digits:[0-9]+ & { return parseToBinary(digits, 10).length <= 8 }
-    { return parseByte(digits, 10) }
+  = prefix:"0x" digits:[0-9A-Fa-f]+
+    { return parseByte(prefix, digits, 16) }
+  / prefix:"0b" digits:[0-1]+
+    { return parseByte(prefix, digits, 2) }
+  / digits:[0-9]+
+    { return parseByte("", digits, 10) }
 
 _ "whitespace"
-  = ws:[ \t]* { return ws.join("") }
+  = ws:[ \t]* 
+    { return ws.join("") }
 
 __ "whitespace and newline"
-  = ws:[ \n\t\r]* { return ws.join("") }
+  = ws:[ \n\t\r]* 
+    { return ws.join("") }
