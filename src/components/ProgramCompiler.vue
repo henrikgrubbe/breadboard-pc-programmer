@@ -66,6 +66,7 @@ export default defineComponent({
   },
   mounted() {
     this.source = '      ldi 4\nx:j:  add data\n      out\n      jmp j\ndata: 0x42\n'
+    //this.source = 'add data\n'
   },
   watch: {
     source: function (code: string) {
@@ -74,11 +75,10 @@ export default defineComponent({
   },
   methods: {
     compile(code: string): void {
-      let parsed;
+      let parsed: string;
       try {
         parsed = this.parser.parse(code, {compile: true});
       } catch (e: unknown) {
-        console.log(e);
         this.error = (e as { message: string }).message as string;
         return;
       }
@@ -95,7 +95,7 @@ export default defineComponent({
     compiledHighlighter(code: string) {
       return code
           .split('\n')
-          .map((line: string) => line.replace(/(\d{4}):(\d{4})(\d{4})/, '<compiled-addr>$1</compiled-addr>:<compiled-instr>$2</compiled-instr><compiled-optcode>$3</compiled-optcode>'))
+          .map((line: string) => line.replace(/(\d{4}):(\d{4})(\d{4})/, '<addr>$1</addr>:<instr>$2</instr><opcode>$3</opcode>'))
           .join('\n');
     },
     uploadProgram(): void {
@@ -104,8 +104,7 @@ export default defineComponent({
       }
 
       const body: Record<string, number> = {};
-      this.compiled
-          .split('\n')
+      this.compiled.split('\n')
           .forEach((line: string) => {
             const [address, instruction] = line.split(':');
             body[parseInt(address, 2).toString()] = parseInt(instruction, 2);
@@ -152,6 +151,25 @@ export default defineComponent({
 
   token-instr token-label {
     color: #9876AA;
+
+    &[defined='false'] {
+      color: #BC3F3C;
+
+      display: inline-block;
+      position: relative;
+
+      &:after {
+        content: '';
+        width: 100%;
+        border-bottom: 2px dotted red;
+        position: absolute;
+        font-size: 16px;
+        top: 16px;
+        left: 1px;
+        display: block;
+        height: 4px;
+      }
+    }
   }
 
   token-label-definition {
@@ -168,15 +186,15 @@ export default defineComponent({
 }
 
 .prism-editor-wrapper.compiled {
-  compiled-addr {
+  addr {
     color: #A5C261;
   }
 
-  compiled-instr {
+  instr {
     color: #6D9CBE;
   }
 
-  compiled-optcode {
+  opcode {
     color: #BC3F3C;
   }
 }

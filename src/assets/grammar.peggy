@@ -3,8 +3,12 @@
     return number.toString(2).padStart(length, "0");
   }
 
-  function wrapInTag(tag, value) {
-  	return `<${tag}>${value}</${tag}>`
+  function tag(tag, value) {
+  	return `<token-${tag}>${value}</token-${tag}>`;
+  }
+
+  function tagWithAttribute(tag, value, attributeName, attributeValue) {
+  	return `<token-${tag} ${attributeName}="${attributeValue}">${value}</token-${tag}>`;
   }
 
   function _checkBinaryLength(value, radix, length) {
@@ -12,36 +16,39 @@
   }
 
   function _parseBinary(prefix, digits, radix, length) {
- 	const str = digits.join("")
+ 	const str = digits.join("");
     const raw = prefix + str;
     const parsed = parseInt(str, radix); 
 
     return {
-      parsed,
-      raw,
       f: () => toBinary(parsed, length), 
-      h: () => wrapInTag("token-immediate", raw) 
+      h: () => tag("immediate", raw),
+      raw
     };
   }
 }}
 
 {
   const labelMap = {};
-  const instructions = [];
+  let numLines = 0;
 
-  function addInstruction(instr) {
-  	instructions.push(instr);
+  function addLine() {
+  	numLines++;
   }
 
   function addLabel(lbl) {
   	labelMap[lbl] = {
       label: lbl, 
-      location: instructions.length
+      location: numLines
     };
   }
 
+  function isLabelDefined(lbl) {
+    return labelMap[lbl] !== undefined;
+  }
+
   function getLabel(lbl) {
-    if (labelMap[lbl] === undefined) {
+    if (!isLabelDefined(lbl)) {
       error(`Use of undefined label: "${lbl}"`);
     }
 
@@ -69,15 +76,17 @@
   function compile(lines) {
     if (options.compile) {
       console.info("labels", labelMap);
-      console.info("instructions", instructions);
+      console.info("lines", lines);
 
-      return instructions
-        .map((instr, index) => `${toBinary(index, 4)}:${instr.f()}`)
+      return lines
+        .map((line, index) => `${toBinary(index, 4)}:${line.f()}`)
         .join("\n");
     }
 
     if (options.highlight) {
-      return lines.join("");
+      return lines
+        .map((line) => line.h())
+        .join("");
     }
 
     error("Option 'compile' or 'highlight' must be passed to parse function");
@@ -88,33 +97,34 @@ program
   = lines:line* { return compile(lines) } 
 
 line
-  = lbls:(lbl:label":" ws:__ { addLabel(lbl.f()); return wrapInTag("token-label-definition", lbl.h()+":") + ws } )* ws1:__ cmd:command ws2:__ 
-    { return `${lbls.join("")}${ws1}${cmd}${ws2}` }
+  = lbls:(lbl:label":" ws:__ { addLabel(lbl.f()); return {h: () => tag("label-definition", `${lbl.h()}:`) + ws} } )* 
+  ws1:__ cmd:command ws2:__ 
+    { addLine(); return {f: cmd.f, h: () => `${lbls.map((lbl) => lbl.h()).join("")}${ws1}${cmd.h()}${ws2}`} }
 
 command
   = i:instruction 
-    { return wrapInTag("token-instr", i) }
+    { return {f: i.f, h: () => tag("instr", i.h())} }
   / b:byte 
-    { addInstruction({f: () => b.f()}); return wrapInTag("token-instr-pseudo", b.h()) }
+    { return {f: b.f, h: () => tag("instr-pseudo", b.h())} }
 
 instruction
-  = mne:"lda" ws:_ a:address   { addInstruction({f: () => "0001" + a.f()}); return `${wrapInTag("token-mnemonic", mne)}${ws}${a.h()}` }
-  / mne:"add" ws:_ a:address   { addInstruction({f: () => "0010" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
-  / mne:"sub" ws:_ a:address   { addInstruction({f: () => "0011" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
-  / mne:"sta" ws:_ a:address   { addInstruction({f: () => "0100" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
-  / mne:"ldi" ws:_ i:immediate { addInstruction({f: () => "0101" + i.f()}); return wrapInTag("token-mnemonic", mne)+ws+i.h() }
-  / mne:"jmp" ws:_ a:address   { addInstruction({f: () => "0110" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
-  / mne:"jc"  ws:_ a:address   { addInstruction({f: () => "0111" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
-  / mne:"jz"  ws:_ a:address   { addInstruction({f: () => "1000" + a.f()}); return wrapInTag("token-mnemonic", mne)+ws+a.h() }
-  / mne:"nop"                  { addInstruction({f: () => "00000000"}); return wrapInTag("token-mnemonic", mne) }
-  / mne:"out"                  { addInstruction({f: () => "11100000"}); return wrapInTag("token-mnemonic", mne) }
-  / mne:"hlt"                  { addInstruction({f: () => "11110000"}); return wrapInTag("token-mnemonic", mne) }
+  = mne:"lda" ws:_ a:address   { return {f: () => "0001" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"add" ws:_ a:address   { return {f: () => "0010" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"sub" ws:_ a:address   { return {f: () => "0011" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"sta" ws:_ a:address   { return {f: () => "0100" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"ldi" ws:_ i:immediate { return {f: () => "0101" + i.f(), h: () => tag("mnemonic", mne)+ws+i.h()} }
+  / mne:"jmp" ws:_ a:address   { return {f: () => "0110" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"jc"  ws:_ a:address   { return {f: () => "0111" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"jz"  ws:_ a:address   { return {f: () => "1000" + a.f(), h: () => tag("mnemonic", mne)+ws+a.h()} }
+  / mne:"nop"                  { return {f: () => "00000000",     h: () => tag("mnemonic", mne)} }
+  / mne:"out"                  { return {f: () => "11100000",     h: () => tag("mnemonic", mne)} }
+  / mne:"hlt"                  { return {f: () => "11110000",     h: () => tag("mnemonic", mne)} }
 
 address
   = imm:immediate 
-    { return {f: imm.f, h: () => wrapInTag("token-jump-target", imm.h()) } }
+    { return {f: imm.f, h: () => tag("jump-target", imm.h()) } }
   / lbl:label 
-    { return {f: () => toBinary(getLabel(lbl.f()).location, 4), h: () => wrapInTag("token-jump-target", lbl.h())} }
+    { return {f: () => toBinary(getLabel(lbl.f()).location, 4), h: () => tag("jump-target", lbl.h())} }
 
 immediate "4 bit word"
   = prefix:"0x" digits:[0-9A-Fa-f]+
@@ -125,8 +135,8 @@ immediate "4 bit word"
     { return parseNibble("", digits, 10) }
 
 label "label"
-  = text:[a-zA-Z]+[a-zA-Z0-9]* 
-    { const lbl = text.join(""); return {f: () => lbl, h: () => wrapInTag("token-label", lbl)} }
+  = [a-zA-Z]+[a-zA-Z0-9]* 
+    { const lbl = text(); return {f: () => lbl, h: () => tagWithAttribute("label", lbl, "defined", isLabelDefined(lbl))} }
 
 byte "8 bit word"
   = prefix:"0x" digits:[0-9A-Fa-f]+
