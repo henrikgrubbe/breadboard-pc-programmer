@@ -1,4 +1,4 @@
-const HOST = 'https://mqtt.it.fantastiskefroe.dk';
+const HOST = 'https://mqtt.private.fantastiskefroe.dk';
 
 export function publishToTopic(topic: string, data: object): Promise<void> {
     const requestOptions = {
