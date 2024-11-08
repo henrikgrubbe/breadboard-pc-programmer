@@ -1,7 +1,7 @@
-# Stage 1: Compile and build Vue app
+# Stage 1: Compile and build the app
 
 # Use official node image as the base image
-FROM node:18-alpine as build
+FROM node:22-alpine as build
 
 # Set the working directory
 WORKDIR /usr/local/app
@@ -9,11 +9,8 @@ WORKDIR /usr/local/app
 # Add the source code to app
 COPY ./ /usr/local/app
 
-# Install all the dependencies
+# Install all dependencies
 RUN npm ci --quiet
-
-ARG RELEASE
-ENV VUE_APP_SENTRY_RELEASE=${RELEASE:-dev}
 
 # Generate the build of the application
 RUN npm run build
@@ -21,9 +18,10 @@ RUN npm run build
 
 # Stage 2: Serve app
 
+# Lightweight http server written in Go
 FROM pierrezemb/gostatic:latest
 
-# Copy the build output to replace the default nginx contents.
+# Copy the build output
 COPY --from=build /usr/local/app/dist /srv/http
 
 # Expose port 8043
